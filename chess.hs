@@ -47,13 +47,13 @@ instance Show State where
   show (State board player)
    | player == whitePlayer =
      -- Print the board facing the white player
-     "\n" ++ (foldl (++) "" (map rankToString board)) ++ (replicate 43'_') ++ "\n" ++ [' ', '|'] ++  "    A    B    C    D    E    F    G    H " 
+     "\n" ++ (foldl (++) "" (map rankToStringWhite board)) ++ (replicate 43'_') ++ "\n" ++ [' ', '|'] ++  "    A    B    C    D    E    F    G    H " 
    | otherwise =
      -- Print the board facing the black player 
-     "\n" ++ (foldl (++) "" (map rankToString (reverse board))) ++ (replicate 43 '_') ++ "\n" ++ [' ', '|'] ++  (reverse "    A    B    C    D    E    F    G    H    ")
+     "\n" ++ (foldl (++) "" (map rankToStringBlack (reverse board))) ++ (replicate 43 '_') ++ "\n" ++ [' ', '|'] ++  (reverse "    A    B    C    D    E    F    G    H    ")
    where
-    rankToString (rn, rank) =  (foldl (\acc (n,_,_,_) -> acc ++ " " ++ (Text.Show.show n) ++ " ") (" |" ++ (Text.Show.show rn) ++ "|") (reverse rank)) ++ "\n\n"
-
+    rankToStringWhite (rn, rank) =  (foldl (\acc (n,_,_,_) -> acc ++ " " ++ (Text.Show.show n) ++ " ") (" |" ++ (Text.Show.show (rn + 1)) ++ "|")  rank) ++ "\n\n"
+    rankToStringBlack (rn, rank) = (foldl (\acc (n,_,_,_) -> acc ++ " " ++ (Text.Show.show n) ++ " ") (" |" ++ (Text.Show.show (rn + 1)) ++ "|") (reverse rank)) ++ "\n\n"
 -- Players 
 -- White player owns the pieces indicated in capital letters
 whitePlayer = "white"
@@ -72,19 +72,19 @@ state0:: State
 state0 = 
    -- To create a new state, make the 8 ranks and assign each of them a number
    -- Then make the white player the one to go first 
-  State (zip [1..8] (map makeRank [1..8])) whitePlayer
+  State (zip [0..7] (map makeRank [0..7])) whitePlayer
 
 -- A rank is a whole row
 -- makeRank takes a row number and provides a default initial state for that row
 makeRank:: Int -> [Piece]
-makeRank 1 = DL.zip4 ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] (zip [1,1..] [1..8]) (replicate 8 blackPlayer) (replicate 8 False)
-makeRank 2 = DL.zip4 (replicate 8 'p') (zip [2,2..] [1..8])   (replicate 8 blackPlayer) (replicate 8 False)
-makeRank 3 = DL.zip4 (replicate 8 '.') (zip [3,3..] [1..8]) (replicate 8 noplayer) (replicate 8 False)
-makeRank 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [1..8]) (replicate 8 noplayer) (replicate 8 False)
-makeRank 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [1..8]) (replicate 8 noplayer) (replicate 8 False)
-makeRank 6 = DL.zip4 (replicate 8 '.') (zip [6,6..] [1..8])  (replicate 8 noplayer) (replicate 8 False)
-makeRank 7 = DL.zip4 (replicate 8 'P') (zip [7,7..] [1..8])  (replicate 8 whitePlayer) (replicate 8 False)
-makeRank 8 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [8,8..] [1..8]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank 0 = DL.zip4 ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank 1 = DL.zip4 (replicate 8 'p') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
+makeRank 2 = DL.zip4 (replicate 8 '.') (zip [2,2..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
+makeRank 3 = DL.zip4 (replicate 8 '.') (zip [3,3..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
+makeRank 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
+makeRank 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 noplayer) (replicate 8 False)
+makeRank 6 = DL.zip4 (replicate 8 'P') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
+makeRank 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 
 
@@ -94,22 +94,22 @@ validCommand command =  command =~ "[a-h][1-8][a-h][1-8]" && (length command == 
 
 -- Convert a letter to an int
 fileToInt:: Char -> Int
-fileToInt 'a' = 1
-fileToInt 'b' = 2
-fileToInt 'c' = 3
-fileToInt 'd' = 4
-fileToInt 'e' = 5
-fileToInt 'f' = 6
-fileToInt 'g' = 7
-fileToInt 'h' = 8
+fileToInt 'a' = 0
+fileToInt 'b' = 1
+fileToInt 'c' = 2
+fileToInt 'd' = 3
+fileToInt 'e' = 4
+fileToInt 'f' = 5
+fileToInt 'g' = 6
+fileToInt 'h' = 7
 
 -- Get the rank and file of current and target position from the command
 getMove:: Command -> Move
 getMove command =
-  let fromFile = fileToInt $ command !! 0
-      fromRank = read [(command !! 1)] + 0 -- Give the read some context 
-      toFile = fileToInt $ command !! 2
-      toRank = read  [(command !! 3)] + 0 -- Give read a context - we need this to ne Int
+  let fromFile = (fileToInt $ command !! 0)
+      fromRank = read [(command !! 1)] - 1 -- Give the read some context 
+      toFile = (fileToInt $ command !! 2)
+      toRank = read  [(command !! 3)] - 1 -- Give read a context - we need this to ne Int
   in ((fromRank, fromFile), (toRank,toFile))
 
 -- Get Piece 
@@ -126,14 +126,13 @@ removePiece position pieces =
   replacePiece position ('.',position, noplayer, True) pieces
 
 -- Play 
-play :: State -> State
-play state = 
-  move state ('P', (7,1), "white", False) (5, 1)
+play :: State -> Piece
+play state = getPieceOnBoard (board state) (fst (getMove "a7a5"))
 
 -- Make a move
 move:: State -> Piece -> To -> State
 move state (name, position, player, moved) to =
-   State (map (replacePiece to (name, position, player, moved)) (map (removePiece position) (board state))) (otherPlayer player)
+   State  (map (replacePiece to (name, to, player, True)) (map (removePiece position) (board state))) (otherPlayer player)
 -- Place a piece or replace at the position with the new piece 
 replacePiece:: Position -> Piece -> (Rank, [Piece]) -> (Rank, [Piece])
 replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
@@ -145,7 +144,7 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
 -- TODO:: Step command  - continue here 
 step :: State -> Command -> (Message, Maybe State)
 step state command 
- | validCommand command == True = ("Move made", Just state)
+ | validCommand command == True = ("Move made", Just $ move state (getPieceOnBoard (board state) (fst (getMove command))) (snd (getMove command)))
  | otherwise = ("Invalid command, try again", Just state)
 
 -- Valid moves - rules 
@@ -160,7 +159,7 @@ main = loop $ Just state0
                            let (m, ms) = step s c
                            putStrLn m
                            putStrLn c
-                           putStrLn $ show $ play ms
+                           putStrLn $ show ms
                            loop ms
 
 
