@@ -144,7 +144,7 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
 -- TODO:: Step command  - continue here 
 step :: State -> Command -> (Message, Maybe State)
 step state command 
- | validCommand command == True = ("Move made", Just $ move state (getPieceOnBoard (board state) (fst (getMove command))) (snd (getMove command)))
+ | validCommand command == True = ("🎊🎊🎊 Move MADE!! ", Just $ move state (getPieceOnBoard (board state) (fst (getMove command))) (snd (getMove command)))
  | otherwise = ("Invalid command, try again", Just state)
 
 -- Valid moves - rules 
@@ -154,12 +154,15 @@ step state command
 
 main :: IO ()
 main = loop $ Just state0
-  where loop Nothing = return ()
-        loop (Just s) = do c <- getLine
-                           let (m, ms) = step s c
-                           putStrLn m
-                           putStrLn c
-                           putStrLn $ show ms
-                           loop ms
+  where loop Nothing = return()
+        loop (Just s) =
+          do
+            putStrLn $ show s
+            c <- getLine
+            let (m, ms) = step s c
+            putStrLn m
+            putStrLn c
+            putStrLn $ show ms
+            loop ms
 
 
