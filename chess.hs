@@ -39,7 +39,17 @@ type Rank = Int
 type Board = [(Rank, [Piece])]
 
 -- State is the Board Positions occupied by both players and the the current player
-data State = State {board :: Board, player :: Player}
+data State = State {board :: Board, player :: Player} deriving (Eq)
+
+
+-- Chess Pieces 
+pawn (p,_,_,_) = p == 'P' || p == 'p'
+rook (r,_,_,_) = r == 'R' || r == 'r'
+knight (n,_,_,_) = n == 'N' || n == 'n'
+bishop (b,_,_,_) = b == 'B' || b == 'b'
+queen (q,_,_,_) = q == 'Q' || q == 'q'
+king (k,_,_,_) = k == 'K' || k == 'k'
+
 
 
 -- Implement show method to display the state
@@ -73,6 +83,7 @@ state0 =
    -- To create a new state, make the 8 ranks and assign each of them a number
    -- Then make the white player the one to go first 
   State (zip [0..7] (map makeRank [0..7])) whitePlayer
+
 
 -- A rank is a whole row
 -- makeRank takes a row number and provides a default initial state for that row
@@ -130,8 +141,8 @@ play :: State -> Piece
 play state = getPieceOnBoard (board state) (fst (getMove "a7a5"))
 
 -- Make a move
-move:: State -> Piece -> To -> State
-move state (name, position, player, moved) to =
+makeMove:: State -> Piece -> To -> State
+makeMove state (name, position, player, moved) to =
    State  (map (replacePiece to (name, to, player, True)) (map (removePiece position) (board state))) (otherPlayer player)
 -- Place a piece or replace at the position with the new piece 
 replacePiece:: Position -> Piece -> (Rank, [Piece]) -> (Rank, [Piece])
@@ -143,26 +154,55 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
          else (n,(r, f),p,m)
 -- TODO:: Step command  - continue here 
 step :: State -> Command -> (Message, Maybe State)
-step state command 
- | validCommand command == True = ("🎊🎊🎊 Move MADE!! ", Just $ move state (getPieceOnBoard (board state) (fst (getMove command))) (snd (getMove command)))
+step state command
+ | validCommand command == True && validMove piece moveToBeMade currentPlayer  =
+  -- check if it is a valid move for the appropriate piece
+  ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
+  Just $ makeMove state piece newPosition)
  | otherwise = ("Invalid command, try again", Just state)
+ where piece = (getPieceOnBoard (board state) (fst moveToBeMade))
+       moveToBeMade = getMove command
+       newPosition = snd moveToBeMade
+       currentPlayer = player state
 
 -- Valid moves - rules 
--- Valid moves for pawns
--- Pawns can only move forward, max two steps if the 
-  
+-- Pawn moves
+validMove:: Piece -> Move -> Player -> Bool 
+validMove piece move player
+ | rook piece = True -- Do rook  
+ | knight piece =True -- Knight
+ | bishop piece =True -- Bishop stuff
+ | queen piece =True -- Queen stuff
+ | king piece = True-- King stuff 
+ | pawn piece = checkPawnMove move player
+ | otherwise = False
+
+checkPawnMove:: Move -> Player -> Bool
+checkPawnMove move player =   (verticalMove move) && (forwardMove player move)
+-- checkPawnMove move blackPlayer = True
+-- Movements 
+-- These moves are for the pawns
+forwardMove:: Player -> Move -> Bool
+forwardMove player ((fromRank, fromFile), (toRank, toFile))
+ |player == whitePlayer = (toRank < fromRank)
+ |player == blackPlayer =  (toRank > fromRank)
+ |otherwise = False
+
+ -- Vertical move 
+verticalMove :: Move -> Bool
+verticalMove ((fromRank, fromFile), (toRank, toFile)) = (fromRank /= toRank) && (fromFile == toFile)
+
 
 main :: IO ()
 main = loop $ Just state0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn $ show s
+            putStrLn (if s == state0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
-            putStrLn m
-            putStrLn c
             putStrLn $ show ms
+            putStrLn m
             loop ms
 
 
