@@ -49,6 +49,7 @@ knight (n,_,_,_) = n == 'N' || n == 'n'
 bishop (b,_,_,_) = b == 'B' || b == 'b'
 queen (q,_,_,_) = q == 'Q' || q == 'q'
 king (k,_,_,_) = k == 'K' || k == 'k'
+emptyPiece (e,_,_,_) = e == '.'
 
 
 
@@ -155,7 +156,7 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
 -- TODO:: Step command  - continue here 
 step :: State -> Command -> (Message, Maybe State)
 step state command
- | validCommand command == True && validMove piece moveToBeMade currentPlayer  =
+ | validCommand command == True && validMove state piece moveToBeMade currentPlayer  =
   -- check if it is a valid move for the appropriate piece
   ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
   Just $ makeMove state piece newPosition)
@@ -167,18 +168,18 @@ step state command
 
 -- Valid moves - rules 
 -- Pawn moves
-validMove:: Piece -> Move -> Player -> Bool 
-validMove piece move player
+validMove:: State -> Piece -> Move -> Player -> Bool 
+validMove state piece move player
  | rook piece = True -- Do rook  
  | knight piece =True -- Knight
  | bishop piece =True -- Bishop stuff
  | queen piece =True -- Queen stuff
  | king piece = True-- King stuff 
- | pawn piece = checkPawnMove move player
+ | pawn piece = checkPawnMove state move player
  | otherwise = False
 
-checkPawnMove:: Move -> Player -> Bool
-checkPawnMove move player =   (verticalMove move) && (forwardMove player move)
+checkPawnMove:: State -> Move -> Player -> Bool
+checkPawnMove state move player =   (verticalMove move) && (forwardMove player move) && (emptyPosition (board state) (snd move))
 -- checkPawnMove move blackPlayer = True
 -- Movements 
 -- These moves are for the pawns
@@ -191,6 +192,25 @@ forwardMove player ((fromRank, fromFile), (toRank, toFile))
  -- Vertical move 
 verticalMove :: Move -> Bool
 verticalMove ((fromRank, fromFile), (toRank, toFile)) = (fromRank /= toRank) && (fromFile == toFile)
+
+-- Diagonal move
+diagonalMove :: Move -> Bool
+diagonalMove ((fromRank, fromFile), (toRank, toFile)) = 
+  abs fromRank - toRank  == abs fromFile - toFile
+
+-- Generate all possible diagonal pieces given a position
+diagonalPositions:: Position -> [Position]
+diagonalPositions (rank, file) =
+  topLeft ++ topRight ++ bottomLeft ++ bottomRight
+  where topLeft = zip [rank-1 ,(rank-2) .. 1] [file-1, (file-2) .. 1] -- Generate one step away from current position
+        topRight = zip [rank-1, (rank-2) .. 1] [(file+1) .. 8]
+        bottomLeft = zip [(rank + 1) .. 8] [file-1, (file-2) ..]
+        bottomRight = zip [(rank + 1) ..8] [(file+1)..8]
+
+
+-- Empty Position
+emptyPosition:: Board -> Position -> Bool
+emptyPosition board position = emptyPiece $ getPieceOnBoard board position
 
 
 main :: IO ()
