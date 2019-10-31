@@ -167,7 +167,6 @@ step state command
        currentPlayer = player state
 
 -- Valid moves - rules 
--- Pawn moves
 validMove:: State -> Piece -> Move -> Player -> Bool 
 validMove state piece move player
  | rook piece = True -- Do rook  
@@ -175,14 +174,13 @@ validMove state piece move player
  | bishop piece =True -- Bishop stuff
  | queen piece =True -- Queen stuff
  | king piece = True-- King stuff 
- | pawn piece = checkPawnMove state move player
+ | pawn piece = checkPawnMove state move player -- Pawn rules applied here
  | otherwise = False
 
 checkPawnMove:: State -> Move -> Player -> Bool
 checkPawnMove state move player =   (verticalMove move) && (forwardMove player move) && (emptyPosition (board state) (snd move))
--- checkPawnMove move blackPlayer = True
--- Movements 
--- These moves are for the pawns
+-- ##### Movements ####
+-- Forward move
 forwardMove:: Player -> Move -> Bool
 forwardMove player ((fromRank, fromFile), (toRank, toFile))
  |player == whitePlayer = (toRank < fromRank)
@@ -193,12 +191,18 @@ forwardMove player ((fromRank, fromFile), (toRank, toFile))
 verticalMove :: Move -> Bool
 verticalMove ((fromRank, fromFile), (toRank, toFile)) = (fromRank /= toRank) && (fromFile == toFile)
 
+-- Horizontal move
+horizontalMove:: Move -> Bool
+horizontalMove ((fromRank, fromFile), (toRank, toFile)) = fromRank == toRank && fromFile /= toFile
+
+
+-- ###Diagonal## ---
 -- Diagonal move
 diagonalMove :: Move -> Bool
 diagonalMove ((fromRank, fromFile), (toRank, toFile)) = 
   abs fromRank - toRank  == abs fromFile - toFile
 
--- Generate all possible diagonal pieces given a position
+-- Generate all possible diagonal pieces relative to a position (with that position excluded)
 diagonalPositions:: Position -> [Position]
 diagonalPositions (rank, file) =
   topLeft ++ topRight ++ bottomLeft ++ bottomRight
@@ -207,10 +211,10 @@ diagonalPositions (rank, file) =
         bottomLeft = zip [(rank + 1) .. 8] [file-1, (file-2) ..]
         bottomRight = zip [(rank + 1) ..8] [(file+1)..8]
 
-
--- Empty Position
+-- Empty Position?
 emptyPosition:: Board -> Position -> Bool
 emptyPosition board position = emptyPiece $ getPieceOnBoard board position
+
 
 
 main :: IO ()
