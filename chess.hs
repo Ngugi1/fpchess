@@ -179,8 +179,8 @@ validMove state piece move player
  | rook piece = checkRookMove state move player -- Do rook  
  | knight piece = checkKnightMove state move player -- Knight
  | bishop piece = checkBishopMove state move player -- Bishop stuff
- | queen piece =True -- Queen stuff
- | king piece = True-- King stuff 
+ | queen piece = checkQueenMove state move player -- Queen stuff
+ | king piece = True -- King stuff 
  | pawn piece = checkPawnMove state move player -- Pawn rules applied here
  | otherwise = False
 
@@ -237,7 +237,14 @@ checkBishopMove state move player
     otherPlayerPiece = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
     emptyDestination = emptyPosition currentBoard destinationPosition
     obstructed = diagonallyObstracted currentBoard move
-        
+
+-- Check queen move 
+-- A queen can move just like a bishop or rook
+checkQueenMove :: State -> Move -> Player -> Bool
+checkQueenMove state move player 
+ | diagonalMove move  = checkBishopMove state move player 
+ | (horizontalMove move || verticalMove move ) =  checkRookMove state move player
+ | otherwise = False
 
 
 -- Is a piece obstructed horizontally?
