@@ -142,7 +142,7 @@ removePiece:: Position -> (Rank, [Piece]) -> (Rank, [Piece])
 removePiece position pieces =
   replacePiece position ('.',position, noplayer, True) pieces
 
--- Play 
+-- Play
 play :: State -> Piece
 play state = getPieceOnBoard (board state) (fst (getMove "a7a5"))
 
@@ -158,7 +158,7 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
          if (rank == r && f == file)
          then (pname, (rank,file),player,True)
          else (n,(r, f),p,m)
--- TODO:: Step command  - continue here 
+-- TODO:: Step command  - continue here
 step :: State -> Command -> (Message, Maybe State)
 step state command
  | validCommand command == True && validMove state piece moveToBeMade currentPlayer  =
@@ -168,13 +168,14 @@ step state command
  | otherwise = ("Invalid command, try again", Just state)
  where piece = (getPieceOnBoard (board state) (fst moveToBeMade))
        moveToBeMade = getMove command
+       stepsToMove = sum (stepsMoved moveToBeMade) > 0
        newPosition = snd moveToBeMade
        currentPlayer = player state
 
 -- Valid moves - rules 
 validMove:: State -> Piece -> Move -> Player -> Bool 
 validMove state piece move player
- | rook piece = True -- Do rook  
+ | rook piece = checkRookMove state move player -- Do rook  
  | knight piece =True -- Knight
  | bishop piece =True -- Bishop stuff
  | queen piece =True -- Queen stuff
@@ -182,23 +183,7 @@ validMove state piece move player
  | pawn piece = checkPawnMove state move player -- Pawn rules applied here
  | otherwise = False
 
--- checkPawnMove:: State -> Move -> Player -> Bool
--- checkPawnMove state move player
---   | diagonalMove move && pieceMovedBefore && pieceOwnedByOtherPlayer && unoccupiedDestination = True
---   | movedForward && movedVertically && (steps == (2,0)) && not pieceMovedBefore && not unoccupiedDestination = True
---   | movedForward && movedVertically && (steps == (1,0)) && not unoccupiedDestination = True
---   | otherwise = False
---   where destinationPosition = (snd move)
---         currentBoard = (board state)
---         pieceAtOrigin = (getPieceOnBoard (board state) (fst move))
---         pieceAtDestination = (getPieceOnBoard currentBoard destinationPosition)
---         unoccupiedDestination = emptyPosition currentBoard destinationPosition
---         pieceOwnedByOtherPlayer = pieceOwner pieceAtDestination (otherPlayer player)
---         steps = stepsMoved move
---         movedVertically = verticalMove move
---         movedForward = forwardMove player move
---         pieceMovedBefore = (hasPieceMoved pieceAtOrigin)
-
+-- Rules applicable to the pawn
 checkPawnMove:: State -> Move -> Player -> Bool
 checkPawnMove state move player
   | diagonalMove move && pieceMovedBefore && pieceOwnedByOtherPlayer && not unoccupiedDestination = True
@@ -215,7 +200,36 @@ checkPawnMove state move player
         movedVertically = verticalMove move
         movedForward = forwardMove player move
         pieceMovedBefore = (hasPieceMoved pieceAtOrigin)
+-- Rules for the rook
+-- Rook is allowed to move horizontally and vertically as long as it is 
+-- not obstructed by any other piece 
+-- TODO:: Work on fixing rook move in the morning - issue rules not applied
+checkRookMove::State -> Move -> Player -> Bool
+checkRookMove state move player
+  | horizontalMove move && (emptyDestination || ownedByOtherPlayer )  && (not $ horizontallyObstructed currentBoard move) = True
+  | verticalMove move && (emptyDestination || ownedByOtherPlayer ) && (not $ verticallyObstructed currentBoard move) = True 
+  | otherwise = False
+  where currentBoard = board state
+        destinationPosition = (snd move)
+        destinationPiece = getPieceOnBoard currentBoard destinationPosition
+        emptyDestination = emptyPosition currentBoard destinationPosition
+        ownedByOtherPlayer = pieceOwner destinationPiece $ otherPlayer player
 
+
+
+-- Is a piece obstructed horizontally?
+horizontallyObstructed :: Board -> Move -> Bool
+horizontallyObstructed board ((fromRank, fromFile), (toRank, toFile)) 
+ | fromFile < toFile =  False `elem` (map (emptyPosition board) (zip [fromRank, fromRank ..] [(fromFile+1) .. (toFile-1)]))
+ | fromFile > toFile =  False `elem` (map (emptyPosition board) (zip [fromRank, fromRank ..] [(fromFile-1), (fromFile-2) .. (toFile+1)]))
+ | otherwise = False -- This may never happen
+
+-- Is a piece obstructed vertically?
+verticallyObstructed :: Board -> Move -> Bool
+verticallyObstructed currentBoard ((fromRank, fromFile), (toRank, toFile)) 
+ | fromRank < toRank = False `elem` (map (emptyPosition currentBoard) (zip [(fromRank+1) .. (toRank-1)] [toFile, toFile ..]))
+ | fromRank > toRank = False `elem` (map (emptyPosition currentBoard) (zip [(fromRank-1),(fromRank-2)  .. (toRank+1)] [toFile, toFile ..]))
+ | otherwise = True
 
 -- ##### Movements ####
 -- Forward move
@@ -276,7 +290,8 @@ hasPieceMoved:: Piece -> Bool
 hasPieceMoved (p,_,_,moved) = moved
 
 
-
+play1:: State -> Bool
+play1 state = horizontallyObstructed (board state) (getMove "a7h7")
 main :: IO ()
 main = loop $ Just state0
   where loop Nothing = return()
