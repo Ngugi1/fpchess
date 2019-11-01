@@ -177,8 +177,8 @@ step state command
 validMove:: State -> Piece -> Move -> Player -> Bool 
 validMove state piece move player
  | rook piece = checkRookMove state move player -- Do rook  
- | knight piece =True -- Knight
- | bishop piece =True -- Bishop stuff
+ | knight piece = checkKnightMove state move player -- Knight
+ | bishop piece = checkBishopMove state move player -- Bishop stuff
  | queen piece =True -- Queen stuff
  | king piece = True-- King stuff 
  | pawn piece = checkPawnMove state move player -- Pawn rules applied here
@@ -204,7 +204,6 @@ checkPawnMove state move player
 -- Rules for the rook
 -- Rook is allowed to move horizontally and vertically as long as it is 
 -- not obstructed by any other piece 
--- TODO:: Work on fixing rook move in the morning - issue rules not applied
 checkRookMove::State -> Move -> Player -> Bool
 checkRookMove state move player
   | horizontalMove move && (emptyDestination || ownedByOtherPlayer )  && (not $ horizontallyObstructed currentBoard move) = True
@@ -218,12 +217,27 @@ checkRookMove state move player
 -- Knight movement 
 -- Knight can move over pieces
 checkKnightMove:: State -> Move -> Player -> Bool 
-checkKnightMove state move player = (knightMove move) && (emptyDestination || ownedByOtherPlayer)
+checkKnightMove state move player = 
+  (knightMove move) && (emptyDestination || ownedByOtherPlayer)
  where 
   currentBoard = (board state)
   destinationPosition = (snd move)
   emptyDestination = emptyPosition currentBoard destinationPosition
   ownedByOtherPlayer = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
+
+-- Bishop movements
+-- A bishop moves diagonally
+checkBishopMove:: State -> Move -> Player -> Bool
+checkBishopMove state move player
+  | diagonalMove move && (otherPlayerPiece || emptyDestination) && not obstructed = True
+  | otherwise = False
+  where 
+    currentBoard = (board state)
+    destinationPosition = (snd move)
+    otherPlayerPiece = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
+    emptyDestination = emptyPosition currentBoard destinationPosition
+    obstructed = diagonallyObstracted currentBoard move
+        
 
 
 -- Is a piece obstructed horizontally?
@@ -240,6 +254,18 @@ verticallyObstructed currentBoard ((fromRank, fromFile), (toRank, toFile))
  | fromRank > toRank = False `elem` (map (emptyPosition currentBoard) (zip [(fromRank-1),(fromRank-2)  .. (toRank+1)] [toFile, toFile ..]))
  | otherwise = True
 
+-- Is piece diagonally obstructed?? 
+diagonallyObstracted:: Board -> Move -> Bool
+diagonallyObstracted board ((fromRank, fromFile), (toRank, toFile))
+ | topRight = False `elem` map (emptyPosition board) (zip [fromRank-1, fromRank-2 .. toRank+1] [fromFile+1 .. toFile-1])
+ | topLeft = False `elem` map (emptyPosition board) (zip [fromRank-1, fromRank-2 .. toRank+1] [fromFile-1, fromFile-2 .. toFile+1])
+ | bottomLeft = False `elem` map (emptyPosition board) (zip  [fromRank+1 .. toRank-1][fromFile-1,fromFile-2 .. toFile+1])
+ | bottomRight = False `elem` map (emptyPosition board)  (zip  [fromRank+1 .. toRank-1][fromFile+1 .. toFile-1])
+ | otherwise = True
+ where topRight = (fromRank > toRank) && (fromFile < toFile)
+       bottomLeft = (fromRank < toRank) && (fromFile > toFile)
+       topLeft = (fromRank > toRank) && (fromFile > toFile)
+       bottomRight = (fromRank < toRank) && (fromFile < toFile)
 -- ##### Movements ####
 -- Forward move
 forwardMove:: Player -> Move -> Bool
