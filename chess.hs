@@ -231,7 +231,7 @@ checkBishopMove:: State -> Move -> Player -> Bool
 checkBishopMove state move player
   | diagonalMove move && (otherPlayerPiece || emptyDestination) && not obstructed = True
   | otherwise = False
-  where 
+  where
     currentBoard = (board state)
     destinationPosition = (snd move)
     otherPlayerPiece = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
@@ -245,6 +245,32 @@ checkQueenMove state move player
  | diagonalMove move  = checkBishopMove state move player 
  | (horizontalMove move || verticalMove move ) =  checkRookMove state move player
  | otherwise = False
+
+-- King movement
+checkKingMove :: State -> Move -> Player -> Bool 
+checkKingMove state move player
+ | horizontalMove move &&
+   not (horizontallyObstructed currentBoard move) &&
+   (emptyDestination || otherPlayerPiece) &&
+   singleStep &&
+   not (kingUnderThreat currentBoard destinationPosition) = True
+ | verticalMove move && not (verticallyObstructed currentBoard move) &&
+    (emptyDestination || otherPlayerPiece) && 
+    singleStep &&
+    not (kingUnderThreat currentBoard destinationPosition) = True
+  where destinationPosition = (snd move)
+        currentBoard = (board state)
+        destinationPiece = getPieceOnBoard currentBoard destinationPosition
+        emptyDestination = emptyPosition currentBoard destinationPosition
+        otherPlayerPiece = pieceOwner destinationPiece (otherPlayer player)
+        singleStep = (stepsMoved move == (1,0)) || (stepsMoved move == (0,1))
+
+
+-- Check if king is under threat
+kingUnderThreat :: Board -> Position -> Bool 
+kingUnderThreat state position = False
+
+
 
 
 -- Is a piece obstructed horizontally?
