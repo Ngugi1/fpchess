@@ -143,8 +143,8 @@ removePiece position pieces =
   replacePiece position ('.',position, noplayer, True) pieces
 
 -- Play
-play :: State -> Piece
-play state = getPieceOnBoard (board state) (fst (getMove "a7a5"))
+play :: State -> (Player, Bool)
+play state = ((player state), pieceOwner (getPieceOnBoard (board state) (fst (getMove "a7a5"))) "white")
 
 -- Make a move
 makeMove:: State -> Piece -> To -> State
@@ -161,16 +161,17 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
 -- TODO:: Step command  - continue here
 step :: State -> Command -> (Message, Maybe State)
 step state command
- | validCommand command == True && validMove state piece moveToBeMade currentPlayer  =
-  -- check if it is a valid move for the appropriate piece
+ | validCommand command == True && ownPiece && validMove state piece moveToBeMade currentPlayer && playerMoved = -- && playerMoved && validMove state piece moveToBeMade currentPlayer
   ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
   Just $ makeMove state piece newPosition)
- | otherwise = ("Invalid command, try again", Just state)
+ | otherwise = ("Invalid move/command, try again", Just state)
  where piece = (getPieceOnBoard (board state) (fst moveToBeMade))
        moveToBeMade = getMove command
-       stepsToMove = sum (stepsMoved moveToBeMade) > 0
-       newPosition = snd moveToBeMade
        currentPlayer = player state
+       ownPiece = pieceOwner piece currentPlayer -- You can't move other player's pieces
+       playerMoved = (stepsMoved moveToBeMade) /= (0,0) -- A player must make a move
+       newPosition = snd moveToBeMade
+       
 
 -- Valid moves - rules 
 validMove:: State -> Piece -> Move -> Player -> Bool 
@@ -214,7 +215,15 @@ checkRookMove state move player
         destinationPiece = getPieceOnBoard currentBoard destinationPosition
         emptyDestination = emptyPosition currentBoard destinationPosition
         ownedByOtherPlayer = pieceOwner destinationPiece $ otherPlayer player
-
+-- Knight movement 
+-- Knight can move over pieces
+checkKnightMove:: State -> Move -> Player -> Bool 
+checkKnightMove state move player = (knightMove move) && (emptyDestination || ownedByOtherPlayer)
+ where 
+  currentBoard = (board state)
+  destinationPosition = (snd move)
+  emptyDestination = emptyPosition currentBoard destinationPosition
+  ownedByOtherPlayer = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
 
 
 -- Is a piece obstructed horizontally?
@@ -289,9 +298,7 @@ pieceOwner (p,_,_,_) player
 hasPieceMoved:: Piece -> Bool
 hasPieceMoved (p,_,_,moved) = moved
 
-
-play1:: State -> Bool
-play1 state = horizontallyObstructed (board state) (getMove "a7h7")
+-- Driver - enter program here 
 main :: IO ()
 main = loop $ Just state0
   where loop Nothing = return()
