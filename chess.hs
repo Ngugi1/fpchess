@@ -1,5 +1,6 @@
 import qualified Text.Show
 import qualified Data.List as DL
+import qualified Data.Char
 import Text.Regex.Posix
 -- Command is a combination of initial piece position and final postion - encoded as a string
 type Command = String
@@ -40,6 +41,10 @@ type Board = [(Rank, [Piece])]
 
 -- State is the Board Positions occupied by both players and the the current player
 data State = State {board :: Board, player :: Player} deriving (Eq)
+
+-- Step - how far have you moved from your original position
+-- with respect to both Rank and File? 
+type Step = (Int, Int)
 
 
 -- Chess Pieces 
@@ -177,8 +182,41 @@ validMove state piece move player
  | pawn piece = checkPawnMove state move player -- Pawn rules applied here
  | otherwise = False
 
+-- checkPawnMove:: State -> Move -> Player -> Bool
+-- checkPawnMove state move player
+--   | diagonalMove move && pieceMovedBefore && pieceOwnedByOtherPlayer && unoccupiedDestination = True
+--   | movedForward && movedVertically && (steps == (2,0)) && not pieceMovedBefore && not unoccupiedDestination = True
+--   | movedForward && movedVertically && (steps == (1,0)) && not unoccupiedDestination = True
+--   | otherwise = False
+--   where destinationPosition = (snd move)
+--         currentBoard = (board state)
+--         pieceAtOrigin = (getPieceOnBoard (board state) (fst move))
+--         pieceAtDestination = (getPieceOnBoard currentBoard destinationPosition)
+--         unoccupiedDestination = emptyPosition currentBoard destinationPosition
+--         pieceOwnedByOtherPlayer = pieceOwner pieceAtDestination (otherPlayer player)
+--         steps = stepsMoved move
+--         movedVertically = verticalMove move
+--         movedForward = forwardMove player move
+--         pieceMovedBefore = (hasPieceMoved pieceAtOrigin)
+
 checkPawnMove:: State -> Move -> Player -> Bool
-checkPawnMove state move player =   (verticalMove move) && (forwardMove player move) && (emptyPosition (board state) (snd move))
+checkPawnMove state move player
+  | diagonalMove move && pieceMovedBefore && pieceOwnedByOtherPlayer && not unoccupiedDestination = True
+  | movedForward && movedVertically && (steps == (2,0)) && not pieceMovedBefore && unoccupiedDestination = True
+  | movedForward && movedVertically && (steps == (1,0)) && unoccupiedDestination = True
+  | otherwise = False
+  where destinationPosition = (snd move)
+        currentBoard = (board state)
+        pieceAtOrigin = (getPieceOnBoard (board state) (fst move))
+        pieceAtDestination = (getPieceOnBoard currentBoard destinationPosition)
+        unoccupiedDestination = emptyPosition currentBoard destinationPosition
+        pieceOwnedByOtherPlayer = pieceOwner pieceAtDestination (otherPlayer player)
+        steps = stepsMoved move
+        movedVertically = verticalMove move
+        movedForward = forwardMove player move
+        pieceMovedBefore = (hasPieceMoved pieceAtOrigin)
+
+
 -- ##### Movements ####
 -- Forward move
 forwardMove:: Player -> Move -> Bool
@@ -195,12 +233,18 @@ verticalMove ((fromRank, fromFile), (toRank, toFile)) = (fromRank /= toRank) && 
 horizontalMove:: Move -> Bool
 horizontalMove ((fromRank, fromFile), (toRank, toFile)) = fromRank == toRank && fromFile /= toFile
 
-
+-- Knight move(L o 7) move 
+knightMove :: Move -> Bool
+knightMove ((fromRank, fromFile), (toRank, toFile))
+  | (rankDistance == 2 && fileDistance == 1) || (rankDistance == 1 && fileDistance  == 2) = True
+  | otherwise = False
+  where rankDistance = abs (toRank - fromRank)
+        fileDistance = abs (toFile - fromFile)
 -- ###Diagonal## ---
 -- Diagonal move
 diagonalMove :: Move -> Bool
 diagonalMove ((fromRank, fromFile), (toRank, toFile)) = 
-  abs fromRank - toRank  == abs fromFile - toFile
+  abs (fromRank - toRank)  == abs (fromFile - toFile)
 
 -- Generate all possible diagonal pieces relative to a position (with that position excluded)
 diagonalPositions:: Position -> [Position]
@@ -213,7 +257,23 @@ diagonalPositions (rank, file) =
 
 -- Empty Position?
 emptyPosition:: Board -> Position -> Bool
-emptyPosition board position = emptyPiece $ getPieceOnBoard board position
+emptyPosition board position = emptyPiece (getPieceOnBoard board position)
+
+-- Positins moved - in both directions 
+stepsMoved:: Move -> Step
+stepsMoved ((fromRank, fromFile), (toRank, toFile)) = 
+  (abs $ fromRank - toRank, abs $ fromFile - toFile)
+
+-- Does a piece belong to a given player? 
+pieceOwner::Piece -> Player -> Bool
+pieceOwner (p,_,_,_) player
+ | player == whitePlayer = Data.Char.isUpper p
+ | player == blackPlayer = Data.Char.isLower p
+ | otherwise = False
+
+-- Is this the first time the piece is moved?
+hasPieceMoved:: Piece -> Bool
+hasPieceMoved (p,_,_,moved) = moved
 
 
 
