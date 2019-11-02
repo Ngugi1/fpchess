@@ -54,6 +54,10 @@ queen (q,_,_,_) = q == 'Q' || q == 'q'
 king (k,_,_,_) = k == 'K' || k == 'k'
 emptyPiece (e,_,_,_) = e == '.'
 
+-- Get piece position
+getPiecePosition :: Piece -> Position
+getPiecePosition (_,pos,_,_) = pos
+
 -- Implement show method to display the state
 instance Show State where
   show (State board player)
@@ -113,12 +117,6 @@ makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 noplay
 makeRank1 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 noplayer) (replicate 8 False)
 makeRank1 6 = DL.zip4 (replicate 8 'p') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
 makeRank1 7 = DL.zip4 ['R', '.', '.', '.', 'K', '.', '.', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
-
-
-
-
-
-
 
 -- Validate command is in right format  
 validCommand:: Command -> Bool
@@ -333,14 +331,9 @@ queenSideCastling board move piece player
        whiteRook = getPieceOnBoard board queenSideWhiteRook
        blackRook = getPieceOnBoard board queenSideBlackRook
        queenSide = (snd (snd move)) < 3
-
-
-
-
 -- Check if king is under threat
 kingUnderThreat :: Board -> Position -> Bool 
 kingUnderThreat state position = False
-
 -- Is a piece obstructed horizontally?
 horizontallyObstructed :: Board -> Move -> Bool
 horizontallyObstructed board ((fromRank, fromFile), (toRank, toFile)) 
@@ -390,6 +383,40 @@ knightMove ((fromRank, fromFile), (toRank, toFile))
   | otherwise = False
   where rankDistance = abs (toRank - fromRank)
         fileDistance = abs (toFile - fromFile)
+
+-- A knnight attacks in an L shape
+-- Relative to a position, it can attack in L or 7 shape
+-- These attacking positions are encoded in the list knightAttackingRelativePos 
+-- If a night is in any of these positions relative to the position given, then the position is under attack
+posUnderAttackByKnight :: Board -> Position -> [Move]
+posUnderAttackByKnight board (rank,file) = map (\(_,pos,_,_) -> (pos, (rank,file)))(filter knight (map (getPieceOnBoard board) validPositions))
+ where proposedKnightPositions = map (\(r,f) -> (r + rank, f + file)) knightAttackingRelativePos -- calculate attacking knight position relative to the position given
+       validPositions = filter checkValidPosition proposedKnightPositions
+       knightAttackingRelativePos = [(-2,1), (-2,-1), (2,1), (2,-1),  (-1,2), (-1,-2), (1,2), (1,-2)]
+-- Check valid positions 
+checkValidPosition :: Position -> Bool
+checkValidPosition (rank, file) = (rank >=0 || rank < 8) && (file >= 0 && file < 8)
+-- Position under attack diagonally
+posUnderAttackDiagonally :: State -> Position -> Player -> [Move]
+posUnderAttackDiagonally state position player = validAttackingPieces
+ where possibleAttackingPieces = filter ((flip pieceOwner) (otherPlayer player)) (map (getPieceOnBoard (board state)) (filter checkValidPosition (diagonalPositions position)))
+       -- Piece that make valid moves
+       validAttackingPieces = map (\piece -> if validMove state piece ((getPiecePosition piece), position) (otherPlayer player) then ((getPiecePosition piece), position) else ((9,9), position)) possibleAttackingPieces
+
+
+-- Position under attack horizontally
+posUnderAttackHorizontally :: State -> Position -> Player -> [Move]
+posUnderAttackHorizontally state  (rank, file) player = validAttackingMoves
+  where possibleAttackPieces = filter ((flip pieceOwner) (otherPlayer player)) (map (getPieceOnBoard (board state)) ((zip [rank,rank .. ] [file - 1,file - 2 .. 0]) ++ (zip [rank,rank .. ] [file + 1 .. 7])))
+        validAttackingMoves = map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file)) (otherPlayer player)) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
+
+
+-- Positioon under attack vertically
+posUnderAttackVertically:: State -> Position -> Player -> [Move]
+posUnderAttackVertically state  (rank, file) player = validAttackingMoves
+  where possibleAttackPieces = filter ((flip pieceOwner) (otherPlayer player)) (map (getPieceOnBoard (board state)) ((zip [rank+1 .. 7] [file,file..]) ++ (zip [rank+1 .. 7] [file, file .. ])))
+        validAttackingMoves = map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file)) (otherPlayer player)) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
+
 -- ###Diagonal## ---
 -- Diagonal move
 diagonalMove :: Move -> Bool
