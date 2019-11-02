@@ -29,7 +29,6 @@ type PieceName = Char
 -- Moved - indicates if a piece has been moved 
 type Moved = Bool
 
-
 -- A piece is a combination of the name, position, the player and a flag to see if a piece has been moved
 type Piece = (PieceName, Position, Player, Moved)
 
@@ -46,7 +45,6 @@ data State = State {board :: Board, player :: Player} deriving (Eq)
 -- with respect to both Rank and File? 
 type Step = (Int, Int)
 
-
 -- Chess Pieces 
 pawn (p,_,_,_) = p == 'P' || p == 'p'
 rook (r,_,_,_) = r == 'R' || r == 'r'
@@ -55,8 +53,6 @@ bishop (b,_,_,_) = b == 'B' || b == 'b'
 queen (q,_,_,_) = q == 'Q' || q == 'q'
 king (k,_,_,_) = k == 'K' || k == 'k'
 emptyPiece (e,_,_,_) = e == '.'
-
-
 
 -- Implement show method to display the state
 instance Show State where
@@ -89,10 +85,15 @@ state0 =
    -- To create a new state, make the 8 ranks and assign each of them a number
    -- Then make the white player the one to go first 
   State (zip [0..7] (map makeRank [0..7])) whitePlayer
+test0 :: State
+test0 = 
+  -- To create a new state, make the 8 ranks and assign each of them a number
+   -- Then make the white player the one to go first 
+  State (zip [0..7] (map makeRank1 [0..7])) whitePlayer
 
 
 -- A rank is a whole row
--- makeRank takes a row number and provides a default initial state for that row
+-- makeRank takes a row number and provides an initial state for that row
 makeRank:: Int -> [Piece]
 makeRank 0 = DL.zip4 ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
 makeRank 1 = DL.zip4 (replicate 8 'p') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
@@ -102,6 +103,16 @@ makeRank 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 noplaye
 makeRank 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 noplayer) (replicate 8 False)
 makeRank 6 = DL.zip4 (replicate 8 'P') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
 makeRank 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+
+makeRank1:: Int -> [Piece]
+makeRank1 0 = DL.zip4 ['.', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 1 = DL.zip4 (replicate 8 'P') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 2 = DL.zip4 (replicate 8 '.') (zip [2,2..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
+makeRank1 3 = DL.zip4 (replicate 8 '.') (zip [3,3..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
+makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
+makeRank1 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 noplayer) (replicate 8 False)
+makeRank1 6 = DL.zip4 (replicate 8 'p') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 7 = DL.zip4 ['.', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 
 
@@ -133,18 +144,11 @@ getMove command =
 getPieceOnBoard:: Board -> Position -> Piece
 getPieceOnBoard board (rank, file) = (snd (board !! rank)) !! file
 
--- Check if the move is valid 
--- validMove :: Player -> Piece -> Move -> Bool
-
 
 -- Remove a piece from a rank by replacing it with an empty piece
 removePiece:: Position -> (Rank, [Piece]) -> (Rank, [Piece])
 removePiece position pieces =
   replacePiece position ('.',position, noplayer, True) pieces
-
--- Play
-play :: State -> (Player, Bool)
-play state = ((player state), pieceOwner (getPieceOnBoard (board state) (fst (getMove "a7a5"))) "white")
 
 -- Make a move
 makeMove:: State -> Piece -> To -> State
@@ -158,20 +162,43 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
          if (rank == r && f == file)
          then (pname, (rank,file),player,True)
          else (n,(r, f),p,m)
--- TODO:: Step command  - continue here
+
+-- Control the game from here
 step :: State -> Command -> (Message, Maybe State)
 step state command
- | validCommand command == True && ownPiece && validMove state piece moveToBeMade currentPlayer && playerMoved = -- && playerMoved && validMove state piece moveToBeMade currentPlayer
-  ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
-  Just $ makeMove state piece newPosition)
- | otherwise = ("Invalid move/command, try again", Just state)
+ | pawn piece  && isValidMove = showSuccess  (postProcessMovedPawn state  piece moveToBeMade currentPlayer ) currentPlayer
+ | otherwise = showError state
  where piece = (getPieceOnBoard (board state) (fst moveToBeMade))
        moveToBeMade = getMove command
        currentPlayer = player state
        ownPiece = pieceOwner piece currentPlayer -- You can't move other player's pieces
        playerMoved = (stepsMoved moveToBeMade) /= (0,0) -- A player must make a move
        newPosition = snd moveToBeMade
-       
+       isValidMove = validCommand command == True && 
+                                         ownPiece && 
+                                         validMove state piece moveToBeMade currentPlayer && 
+                                         playerMoved
+
+-- Success message
+showSuccess :: State  -> Player -> (Message, Maybe State)
+showSuccess state currentPlayer = ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
+  Just $ state)
+
+-- Failure message 
+showError :: State -> (Message, Maybe State)
+showError state = ("Invalid move/command, try again", Nothing)
+
+promotePawn :: Piece -> Move -> Player ->  Piece
+promotePawn (name, pos, player, moved) move currentPlayer 
+ | currentPlayer == whitePlayer &&  newRank == 0 = ('Q', (snd move), player, True)
+ | currentPlayer == blackPlayer &&  newRank == 7 = ('q', (snd move), player, True)
+ | otherwise = (name, pos, player, moved)
+ where newRank = (fst (snd move)) 
+
+postProcessMovedPawn :: State -> Piece -> Move -> Player -> State
+postProcessMovedPawn state piece move player = makeMove state newPawn (snd move)
+  where newPawn = promotePawn piece move player
+
 
 -- Valid moves - rules 
 validMove:: State -> Piece -> Move -> Player -> Bool 
@@ -181,7 +208,7 @@ validMove state piece move player
  | bishop piece = checkBishopMove state move player -- Bishop stuff
  | queen piece = checkQueenMove state move player -- Queen stuff
  | king piece = True -- King stuff 
- | pawn piece = checkPawnMove state move player -- Pawn rules applied here
+ | pawn piece = checkPawnMove state move player 
  | otherwise = False
 
 -- Rules applicable to the pawn
@@ -265,13 +292,9 @@ checkKingMove state move player
         otherPlayerPiece = pieceOwner destinationPiece (otherPlayer player)
         singleStep = (stepsMoved move == (1,0)) || (stepsMoved move == (0,1))
 
-
 -- Check if king is under threat
 kingUnderThreat :: Board -> Position -> Bool 
 kingUnderThreat state position = False
-
-
-
 
 -- Is a piece obstructed horizontally?
 horizontallyObstructed :: Board -> Move -> Bool
@@ -341,7 +364,7 @@ diagonalPositions (rank, file) =
 emptyPosition:: Board -> Position -> Bool
 emptyPosition board position = emptyPiece (getPieceOnBoard board position)
 
--- Positins moved - in both directions 
+-- Positions moved - in both directions 
 stepsMoved:: Move -> Step
 stepsMoved ((fromRank, fromFile), (toRank, toFile)) = 
   (abs $ fromRank - toRank, abs $ fromFile - toFile)
