@@ -105,14 +105,18 @@ makeRank 6 = DL.zip4 (replicate 8 'P') (zip [6,6..] [0..7])  (replicate 8 whiteP
 makeRank 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 makeRank1:: Int -> [Piece]
-makeRank1 0 = DL.zip4 ['.', 'n', 'b', 'q', 'k', 'b', 'n', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 0 = DL.zip4 ['r', '.', '.', '.', 'k', '.', '.', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 1 = DL.zip4 (replicate 8 'P') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 2 = DL.zip4 (replicate 8 '.') (zip [2,2..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
 makeRank1 3 = DL.zip4 (replicate 8 '.') (zip [3,3..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
 makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
 makeRank1 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 noplayer) (replicate 8 False)
 makeRank1 6 = DL.zip4 (replicate 8 'p') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
-makeRank1 7 = DL.zip4 ['.', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 7 = DL.zip4 ['R', '.', '.', '.', 'K', '.', '.', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+
+
+
+
 
 
 
@@ -166,19 +170,24 @@ replacePiece (rank, file) (pname,_,player,_) (rn, pieces) =
 -- Control the game from here
 step :: State -> Command -> (Message, Maybe State)
 step state command
- | pawn piece  && isValidMove = showSuccess  (postProcessMovedPawn state  piece moveToBeMade currentPlayer ) currentPlayer
+ | pawn piece  && isValidMove = showSuccess  (postProcessMovedPawn state  piece moveToBeMade currentPlayer) currentPlayer
+ | king piece && isValidMove = showSuccess (makeMove state piece newPosition) currentPlayer
+ | king piece && kingSideCast = showSuccess (makeMove (makeMove state piece newPosition) ksRook newRookKingSidePos) currentPlayer -- Move appropriate Rook
+ | king piece && queenSideCast  = showSuccess (makeMove (makeMove state piece newPosition) qsRook newRookQueebSidePos) currentPlayer -- (getPieceOnBoard currentBoard qsRookPos) newRookKingSidePos) currentPlayer -- Move appropriate Rook
+ | isValidMove = showSuccess (makeMove state piece newPosition) currentPlayer
  | otherwise = showError state
- where piece = (getPieceOnBoard (board state) (fst moveToBeMade))
+ where currentBoard = (board state) 
+       piece = (getPieceOnBoard currentBoard (fst moveToBeMade))
        moveToBeMade = getMove command
        currentPlayer = player state
        ownPiece = pieceOwner piece currentPlayer -- You can't move other player's pieces
        playerMoved = (stepsMoved moveToBeMade) /= (0,0) -- A player must make a move
        newPosition = snd moveToBeMade
-       isValidMove = validCommand command == True && 
-                                         ownPiece && 
-                                         validMove state piece moveToBeMade currentPlayer && 
-                                         playerMoved
-
+       newRookKingSidePos = ((fst (snd moveToBeMade))  , ((snd (snd moveToBeMade)) - 1))
+       newRookQueebSidePos = ((fst (snd moveToBeMade))  , ((snd (snd moveToBeMade)) + 1))
+       isValidMove = validCommand command && ownPiece && playerMoved && validMove state piece moveToBeMade currentPlayer
+       (kingSideCast, ksRook) = kingSideCastling currentBoard moveToBeMade piece currentPlayer
+       (queenSideCast, qsRook) = queenSideCastling currentBoard moveToBeMade piece currentPlayer
 -- Success message
 showSuccess :: State  -> Player -> (Message, Maybe State)
 showSuccess state currentPlayer = ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
@@ -276,21 +285,57 @@ checkQueenMove state move player
 -- King movement
 checkKingMove :: State -> Move -> Player -> Bool 
 checkKingMove state move player
- | horizontalMove move &&
+ | singleStep && horizontalMove move &&
    not (horizontallyObstructed currentBoard move) &&
    (emptyDestination || otherPlayerPiece) &&
-   singleStep &&
    not (kingUnderThreat currentBoard destinationPosition) = True
- | verticalMove move && not (verticallyObstructed currentBoard move) &&
+ | singleStep && verticalMove move && not (verticallyObstructed currentBoard move) &&
     (emptyDestination || otherPlayerPiece) && 
-    singleStep &&
     not (kingUnderThreat currentBoard destinationPosition) = True
-  where destinationPosition = (snd move)
+ | otherwise = False
+ where  destinationPosition = (snd move)
         currentBoard = (board state)
         destinationPiece = getPieceOnBoard currentBoard destinationPosition
+        piecePlayed = getPieceOnBoard currentBoard (fst move)
         emptyDestination = emptyPosition currentBoard destinationPosition
         otherPlayerPiece = pieceOwner destinationPiece (otherPlayer player)
         singleStep = (stepsMoved move == (1,0)) || (stepsMoved move == (0,1))
+        twoSteps = (stepsMoved move == (0,2))
+
+-- Castling 
+kingSideWhiteRook = (7,7) -- Original position of it hasn't moved
+kingSideBlackRook = (0,7) -- Original Position - not moved
+queenSideWhiteRook = (7,0) -- Original position
+queenSideBlackRook = (0,0)
+
+-- Check if the King castled
+kingSideCastling:: Board -> Move -> Piece -> Player -> (Bool, Piece)
+kingSideCastling board move piece player
+ | kingSide && wplayer && not kingMoved && rook whiteRook && not (horizontallyObstructed board (fst move, kingSideWhiteRook)) = (True , whiteRook)
+ | kingSide && bplayer && not kingMoved && rook blackRook  && not (horizontallyObstructed board (fst move, kingSideBlackRook))  = (True, blackRook)
+ | otherwise = (False, ('.', (9,9), "", False)) -- Make compiler happy, second part of couple is of no use
+ where kingMoved =  (hasPieceMoved piece)
+       bplayer = player == whitePlayer
+       wplayer = player == blackPlayer
+       whiteRook = getPieceOnBoard board kingSideWhiteRook
+       blackRook = getPieceOnBoard board kingSideBlackRook
+       kingSide = (snd (snd move)) > 3
+
+-- Queen Side castling
+queenSideCastling:: Board -> Move -> Piece -> Player -> (Bool, Piece)
+queenSideCastling board move piece player
+ | queenSide && wplayer && not kingMoved && rook whiteRook  && not (horizontallyObstructed board (fst move, queenSideWhiteRook)) = (True, whiteRook)
+ | queenSide && bplayer && not kingMoved && rook blackRook && not (horizontallyObstructed board (fst move, queenSideBlackRook))  = (True, blackRook)
+ | otherwise = (False, piece) -- Make compiler happy
+ where kingMoved =  (hasPieceMoved piece)
+       bplayer = player == whitePlayer
+       wplayer = player == blackPlayer
+       whiteRook = getPieceOnBoard board queenSideWhiteRook
+       blackRook = getPieceOnBoard board queenSideBlackRook
+       queenSide = (snd (snd move)) < 3
+
+
+
 
 -- Check if king is under threat
 kingUnderThreat :: Board -> Position -> Bool 
