@@ -111,10 +111,10 @@ makeRank1 0 = DL.zip4 ['r', '.', '.', '.', 'k', '.', '.', 'r'] (zip [0,0..] [0..
 makeRank1 1 = DL.zip4 (replicate 8 'q') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 2 = DL.zip4 (replicate 8 'n') (zip [2,2..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 3 = DL.zip4 (replicate 8 'n') (zip [3,3..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 4 = DL.zip4 (replicate 8 'P') (zip [4,4..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
-makeRank1 5 = DL.zip4 (replicate 8 'n') (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 6 = DL.zip4 (replicate 8 'n') (zip [6,6..] [0..7])  (replicate 8 blackPlayer) (replicate 8 True)
-makeRank1 7 = DL.zip4 ['R', '.', 'q', '.', 'K', 'r', '.', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 5 = DL.zip4 ['.', 'q', 'q', 'q', 'q', 'q', 'q', 'q'] (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 6 = DL.zip4 (replicate 8 'P') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 -- Validate command is in right format
 validCommand:: Command -> Bool
@@ -167,8 +167,13 @@ promotePawn (name, pos, player, moved) move currentPlayer
 
 -- Helper function for promoting pawn
 postProcessMovedPawn :: State -> Piece -> Move -> Player -> State
-postProcessMovedPawn state piece move player = makeMove state newPawn (snd move)
+postProcessMovedPawn state piece move player
+  | not pawnMoved && length attackingPieces > 0 =  makeMove (makeMove state (getPieceOnBoard (board state) (fst move)) enPassantPos) (getPieceOnBoard (board state) (fst (attackingPieces !! 0))) enPassantPos
+  | otherwise = (makeMove state newPawn newPosition)
   where newPawn = promotePawn piece move player
+        newPosition = (snd move)
+        pawnMoved = hasPieceMoved piece
+        (enPassantPos, attackingPieces) = enPassantPawnCapture state move player
 
 -- Valid moves - dispatch based on the piece 
 validMove:: State -> Piece -> Move -> Player -> Bool 
@@ -224,8 +229,8 @@ kingSideCastling board move piece player
  | kingSide && bplayer && not kingMoved && rook blackRook  && not (horizontallyObstructed board (fst move, kingSideBlackRook))  = (True, blackRook)
  | otherwise = (False, piece)
  where kingMoved =  (hasPieceMoved piece)
-       bplayer = player == whitePlayer
-       wplayer = player == blackPlayer
+       bplayer = player == blackPlayer
+       wplayer = player == whitePlayer
        whiteRook = getPieceOnBoard board kingSideWhiteRook
        blackRook = getPieceOnBoard board kingSideBlackRook
        kingSide = (snd (snd move)) > 3
@@ -264,6 +269,20 @@ checkPawnMove state move player
         movedVertically = verticalMove move
         movedForward = forwardMove player move
         pieceMovedBefore = (hasPieceMoved pieceAtOrigin)
+        (enPassantPos, enPassantAttacks) = enPassantPawnCapture state move player
+
+-- Is it an enpassant ? 
+enPassantPawnCapture :: State -> Move -> Player -> (Position, [Move])
+enPassantPawnCapture state ((fRank, fFile),to) player
+ | player == whitePlayer && (steps == (2,0)) = blackAttackingPieces
+ | player == blackPlayer && (steps == (2,0)) = whiteAttackingPieces
+  where whiteEnPassantPos = (fRank-1, fFile)
+        blackEnPassantPos = (fRank+1, fFile)
+        steps = (stepsMoved((fRank, fFile),to))
+        blackAttackingPieces = (whiteEnPassantPos, (positionUnderAttack state whiteEnPassantPos (otherPlayer player)))
+        whiteAttackingPieces = (whiteEnPassantPos, (positionUnderAttack state blackEnPassantPos (otherPlayer player)))
+
+
 -- Rules for the rook
 -- Rook is allowed to move horizontally and vertically as long as it is 
 -- not obstructed by any other piece 
@@ -372,14 +391,21 @@ stepsMoved ((fromRank, fromFile), (toRank, toFile)) =
   (abs $ fromRank - toRank, abs $ fromFile - toFile)
 
 --- ########### Check if a position is under attack
+  -- Position under attack 
+positionUnderAttack:: State -> Position -> Player -> [Move]
+positionUnderAttack state position player = posUnderAttackByKnight state position player ++  
+                                            posUnderAttackDiagonally  state position player ++
+                                            posUnderAttackHorizontally state position player ++
+                                            posUnderAttackVertically state position player
+
 -- A knight attacks in an L or 7 shape
 -- Relative to a position, it can attack in L or 7 shape
 -- These attacking positions are encoded in the list knightAttackingRelativePos 
 -- If a night is in any of these positions relative to the position given, then the position is under attack
-posUnderAttackByKnight :: Board -> Position -> [Move]
-posUnderAttackByKnight board (rank,file) = map (\(_,pos,_,_) -> (pos, (rank,file)))(filter knight (map (getPieceOnBoard board) validPositions))
+posUnderAttackByKnight :: State -> Position -> Player -> [Move]
+posUnderAttackByKnight state (rank,file) player = map (\(_,pos,_,_) -> (pos, (rank,file))) (filter knight  validAttackingPieces)
  where proposedKnightPositions = map (\(r,f) -> (r + rank, f + file)) knightAttackingRelativePos -- calculate attacking knight position relative to the position given
-       validPositions = filter checkValidPosition proposedKnightPositions
+       validAttackingPieces = filter (pieceOwner player) (map (getPieceOnBoard (board state)) (filter checkValidPosition proposedKnightPositions))
        knightAttackingRelativePos = [(-2,1), (-2,-1), (2,1), (2,-1),  (-1,2), (-1,-2), (1,2), (1,-2)]
 -- Position under attack diagonally
 posUnderAttackDiagonally :: State -> Position -> Player -> [Move]
@@ -435,11 +461,11 @@ showError :: State -> (Message, Maybe State)
 showError state = ("Invalid move/command, try again", Just state)
 -- Driver - enter program here 
 main :: IO ()
-main = loop $ Just state0
+main = loop $ Just test0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn (if s == state0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
+            putStrLn (if s == test0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
             putStrLn $ show ms
