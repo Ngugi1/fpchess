@@ -112,8 +112,8 @@ makeRank1 1 = DL.zip4 (replicate 8 'q') (zip [1,1..] [0..7])   (replicate 8 blac
 makeRank1 2 = DL.zip4 (replicate 8 'n') (zip [2,2..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 3 = DL.zip4 (replicate 8 'n') (zip [3,3..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
-makeRank1 5 = DL.zip4 ['.', 'q', 'q', 'q', 'q', 'q', 'q', 'q'] (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 6 = DL.zip4 (replicate 8 'P') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 5 = DL.zip4 ['.', 'q', 'q', '.', '.', '.', 'q', 'q'] (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 6 = DL.zip4 ['.', '.', '.', 'P', '.', '.', '.', '.'] (zip [6,6..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 -- Validate command is in right format
@@ -201,11 +201,9 @@ checkKingMove :: State -> Move -> Player -> Bool
 checkKingMove state move player
  | singleStep && horizontalMove move &&
    not (horizontallyObstructed currentBoard move) &&
-   (emptyDestination || otherPlayerPiece) &&
-   not (kingUnderThreat currentBoard destinationPosition) = True
+   (emptyDestination || otherPlayerPiece) = True
  | singleStep && verticalMove move && not (verticallyObstructed currentBoard move) &&
-    (emptyDestination || otherPlayerPiece) && 
-    not (kingUnderThreat currentBoard destinationPosition) = True
+    (emptyDestination || otherPlayerPiece) = True
  | otherwise = False
  where  destinationPosition = (snd move)
         currentBoard = (board state)
@@ -247,9 +245,10 @@ queenSideCastling board move piece player
        blackRook = getPieceOnBoard board queenSideBlackRook
        queenSide = (snd (snd move)) < 3
 
--- TODO::  Check if king is under threat
-kingUnderThreat :: Board -> Position -> Bool 
-kingUnderThreat state position = False
+-- Check if king is under threat - being attacked
+kingUnderThreat :: State -> Player -> Bool
+kingUnderThreat state player = (length (positionUnderAttack state (getPiecePosition playersKing) player)) > 0
+  where playersKing = (filter (pieceOwner player) (filter king (concat (map (\(rank, pieces) -> pieces) (board state))))) !! 0
 
 -- Pawn rules
 -- Rules applicable to the pawn
@@ -276,6 +275,7 @@ enPassantPawnCapture :: State -> Move -> Player -> (Position, [Move])
 enPassantPawnCapture state ((fRank, fFile),to) player
  | player == whitePlayer && (steps == (2,0)) = blackAttackingPieces
  | player == blackPlayer && (steps == (2,0)) = whiteAttackingPieces
+ | otherwise = ((9,9), [])
   where whiteEnPassantPos = (fRank-1, fFile)
         blackEnPassantPos = (fRank+1, fFile)
         steps = (stepsMoved((fRank, fFile),to))
@@ -316,7 +316,7 @@ checkBishopMove state move player
   where
     currentBoard = (board state)
     destinationPosition = (snd move)
-    otherPlayerPiece = pieceOwner (otherPlayer player) (getPieceOnBoard currentBoard destinationPosition) 
+    otherPlayerPiece = pieceOwner (otherPlayer player) (getPieceOnBoard currentBoard destinationPosition)
     emptyDestination = emptyPosition currentBoard destinationPosition
     obstructed = diagonallyObstracted currentBoard move
 
@@ -436,13 +436,12 @@ diagonalPositions (rank, file) =
         bottomLeft = zip [(rank + 1) .. 7] [file-1, (file-2) ..]
         bottomRight = zip [(rank + 1) .. 7] [(file+1)..7]
 
-
 -- Control the game from here
 step :: State -> Command -> (Message, Maybe State)
 step state command
- | pawn piece  && isValidMove = showSuccess  (postProcessMovedPawn state  piece moveToBeMade currentPlayer) currentPlayer
- | king piece && isValidMove = showSuccess (makeMove state piece newPosition) currentPlayer
- | isValidMove = showSuccess (makeMove state piece newPosition) currentPlayer
+ | pawn piece  && isValidMove = validateSuccess state (postProcessMovedPawn state  piece moveToBeMade currentPlayer) currentPlayer
+ | king piece && isValidMove = validateSuccess state (makeMove state piece newPosition) currentPlayer
+ | isValidMove = validateSuccess state (makeMove state piece newPosition) currentPlayer
  | otherwise = showError state
  where currentBoard = (board state) 
        piece = (getPieceOnBoard currentBoard (fst moveToBeMade))
@@ -453,9 +452,10 @@ step state command
        newPosition = snd moveToBeMade
        isValidMove = validCommand command && ownPiece && playerMoved && validMove state piece moveToBeMade currentPlayer
 -- Success message
-showSuccess :: State  -> Player -> (Message, Maybe State)
-showSuccess state currentPlayer = ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
-  Just $ state)
+validateSuccess :: State -> State  -> Player -> (Message, Maybe State)
+validateSuccess oldState newState currentPlayer
+ | kingUnderThreat newState (otherPlayer currentPlayer) = ("Check:: Invalid move \n" ++ show currentPlayer ++ ", play again", Just oldState)
+ | otherwise =  ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",Just $ newState)
 -- Failure message 
 showError :: State -> (Message, Maybe State)
 showError state = ("Invalid move/command, try again", Just state)
@@ -465,7 +465,7 @@ main = loop $ Just test0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn (if s == test0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
+            putStrLn (if s == test0 then show s ++ "\n\n " ++whitePlayer ++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
             putStrLn $ show ms
@@ -473,8 +473,7 @@ main = loop $ Just test0
             loop ms
 
 
--- TODO:: Start by testing the attack functions
--- TODO :: Implement en passant 
+
 -- TODO :: check for checkers
 -- TODO :: draws
 -- TODO -- stalemates
