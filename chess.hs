@@ -170,8 +170,6 @@ step :: State -> Command -> (Message, Maybe State)
 step state command
  | pawn piece  && isValidMove = showSuccess  (postProcessMovedPawn state  piece moveToBeMade currentPlayer) currentPlayer
  | king piece && isValidMove = showSuccess (makeMove state piece newPosition) currentPlayer
- | king piece && kingSideCast = showSuccess (makeMove (makeMove state piece newPosition) ksRook newRookKingSidePos) currentPlayer -- Move appropriate Rook
- | king piece && queenSideCast  = showSuccess (makeMove (makeMove state piece newPosition) qsRook newRookQueebSidePos) currentPlayer -- (getPieceOnBoard currentBoard qsRookPos) newRookKingSidePos) currentPlayer -- Move appropriate Rook
  | isValidMove = showSuccess (makeMove state piece newPosition) currentPlayer
  | otherwise = showError state
  where currentBoard = (board state) 
@@ -181,11 +179,7 @@ step state command
        ownPiece = pieceOwner currentPlayer piece  -- You can't move other player's pieces
        playerMoved = (stepsMoved moveToBeMade) /= (0,0) -- A player must make a move
        newPosition = snd moveToBeMade
-       newRookKingSidePos = ((fst (snd moveToBeMade))  , ((snd (snd moveToBeMade)) - 1))
-       newRookQueebSidePos = ((fst (snd moveToBeMade))  , ((snd (snd moveToBeMade)) + 1))
        isValidMove = validCommand command && ownPiece && playerMoved && validMove state piece moveToBeMade currentPlayer
-       (kingSideCast, ksRook) = kingSideCastling currentBoard moveToBeMade piece currentPlayer
-       (queenSideCast, qsRook) = queenSideCastling currentBoard moveToBeMade piece currentPlayer
 -- Success message
 showSuccess :: State  -> Player -> (Message, Maybe State)
 showSuccess state currentPlayer = ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",
@@ -214,9 +208,20 @@ validMove state piece move player
  | knight piece = checkKnightMove state move player -- Knight
  | bishop piece = checkBishopMove state move player -- Bishop stuff
  | queen piece = checkQueenMove state move player -- Queen stuff
- | king piece = True -- King stuff 
- | pawn piece = checkPawnMove state move player 
+ | king piece && validMoveKing state piece move player = True
+ | pawn piece = checkPawnMove state move player
  | otherwise = False
+
+-- King conditions are more complex - put them in own function
+validMoveKing :: State -> Piece -> Move -> Player -> Bool
+validMoveKing state piece move player
+ | (checkKingMove state move player) || kingSideCast || queenSideCast = True
+ where currentBoard = board state
+       (kingSideCast, ksRook) = kingSideCastling currentBoard move piece player
+       (queenSideCast, qsRook) = queenSideCastling currentBoard move piece player
+       newPosition = snd move
+       newRookKingSidePos = ((fst (snd move))  , ((snd (snd move)) - 1))
+       newRookQueebSidePos = ((fst (snd move))  , ((snd (snd move)) + 1))
 
 -- Rules applicable to the pawn
 checkPawnMove:: State -> Move -> Player -> Bool
@@ -454,11 +459,11 @@ hasPieceMoved (p,_,_,moved) = moved
 
 -- Driver - enter program here 
 main :: IO ()
-main = loop $ Just test0
+main = loop $ Just state0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn (if s == test0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
+            putStrLn (if s == state0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
             putStrLn $ show ms
