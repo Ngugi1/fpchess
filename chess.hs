@@ -433,7 +433,7 @@ posUnderAttackVertically state  (rank, file) player = validAttackingMoves
 -- k&k-b
 -- k&k-n
 -- k-b&k-b bishops reside on same color
--- TODO::  Very messy implementation, Refactor this !!
+-- TODO::  Very messy implementation -  Refactor this !!
 drawByInsufficientMaterial:: Board -> Bool
 drawByInsufficientMaterial board
  | length blackPlayerPieces == 1 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces &&  'k' `elem` blackPlayerPieces = True
@@ -441,18 +441,19 @@ drawByInsufficientMaterial board
  | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'n' `elem` whitePlayerPieces = True
  | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'B' `elem` blackPlayerPieces = True
  | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'b' `elem` whitePlayerPieces = True
- | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'b' `elem` whitePlayerPieces && 'B' `elem` whitePlayerPieces  = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 
+ 'b' `elem` whitePlayerPieces && 'B' `elem` whitePlayerPieces && even (fst (bbishop !! 0)) && even (snd (bbishop !! 0)) && 
+ even (fst (wbishop !! 0)) && even (snd (wbishop !! 0))  = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 
+ 'b' `elem` whitePlayerPieces && 'B' `elem` whitePlayerPieces && odd (fst (bbishop !! 0)) && odd (snd (bbishop !! 0)) && 
+ odd (fst (wbishop !! 0)) && odd (snd (wbishop !! 0))  = True
  | otherwise = False
  where blackPlayerPieces = map getPieceName (getPlayerPieces board blackPlayer)
        whitePlayerPieces = map getPieceName (getPlayerPieces board whitePlayer)
+       bbishop = map getPiecePosition (filter bishop (getPlayerPieces board blackPlayer))
+       wbishop = map getPiecePosition (filter bishop (getPlayerPieces board whitePlayer))
        blackPlayerPos = map getPiecePosition (getPlayerPieces board blackPlayer)
        whitePlayerPos = map getPiecePosition (getPlayerPieces board whitePlayer)
-
- 
- 
-
-
-
 -- ###  Generate positions
 -- Generate all possible diagonal pieces relative to a position (with that position excluded)
 diagonalPositions:: Position -> [Position]
@@ -500,7 +501,7 @@ getPlayerPieces board player = flatBoard
   where flatBoard = filter (pieceOwner player) (concat (map (\(rank, pieces) -> pieces) board))
 -- check if a player is in a stalemate
 checkStalemate :: State -> Player -> Bool
-checkStalemate state player = (length (map (hasValidMoves state player) playerPieces)) > 0
+checkStalemate state player = (length (map (hasValidMoves state player) playerPieces)) == 0
  where playerPieces = getPlayerPieces (board state) player
 
 -- Has valid moves
@@ -537,8 +538,9 @@ step state command
 -- Success message
 validateSuccess :: State -> State  -> Player -> (Message, Maybe State)
 validateSuccess oldState newState currentPlayer
+ | drawByInsufficientMaterial (board newState) = ("Draw by insufficient material", Nothing)
  | kingUnderThreat newState currentPlayer = ("Invalid move, your king will be in check!! \n" ++ show currentPlayer ++ ", play again", Just oldState)
- | kingUnderThreat newState (otherPlayer currentPlayer) && checkStalemate newState (otherPlayer currentPlayer) = ("Game over!! \n" ++ show (otherPlayer currentPlayer) ++ " is in check", Nothing)
+ | kingUnderThreat newState (otherPlayer currentPlayer) && checkStalemate newState (otherPlayer currentPlayer) = ("Game over!! \n Checkers!!", Nothing)
  | checkStalemate newState (otherPlayer currentPlayer)  = ("Game over !! \n" ++ show (otherPlayer currentPlayer) ++ " has no legal moves", Nothing)
  | checkStalemate newState currentPlayer  = ("Game over !! \n" ++ show  currentPlayer ++ " has no legal moves", Nothing)
  | otherwise =  ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",Just $ newState)
@@ -547,11 +549,11 @@ showError :: State -> (Message, Maybe State)
 showError state = ("Invalid move/command, try again", Just state)
 -- Driver - enter program here
 main :: IO ()
-main = loop $ Just test0
+main = loop $ Just state0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn (if s == test0 then show s ++ "\n\n " ++whitePlayer ++ ",it is your turn" else "")
+            putStrLn (if s == state0 then show s ++ "\n\n " ++whitePlayer ++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
             putStrLn $ show ms
