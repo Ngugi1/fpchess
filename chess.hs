@@ -28,6 +28,9 @@ type PieceName = Char
 type Moved = Bool
 -- A piece is a combination of the name, position, the player and a flag to see if a piece has been moved
 type Piece = (PieceName, Position, Player, Moved)
+-- get the name of the piece 
+getPieceName :: Piece -> PieceName
+getPieceName (p,_,_,_) = p
 -- Is this the first time the piece is moved?
 hasPieceMoved:: Piece -> Bool
 hasPieceMoved (p,_,_,moved) = moved
@@ -429,13 +432,23 @@ posUnderAttackVertically state  (rank, file) player = validAttackingMoves
 -- k-k
 -- k&k-b
 -- k&k-n
--- k-b&k-b bishops redide on same color
--- drawByInsufficientMaterial:: Board
--- drawByInsufficientMaterial board
---  | length blackPlayerPieces == 1 && length whitePlayerPieces  = True
---  | otherwise = False
---  where blackPlayerPieces = getPlayerPieces board blackPlayer
---        whitePlayerPieces = getPlayerPieces board whitePlayer
+-- k-b&k-b bishops reside on same color
+-- TODO::  Very messy implementation, Refactor this !!
+drawByInsufficientMaterial:: Board -> Bool
+drawByInsufficientMaterial board
+ | length blackPlayerPieces == 1 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces &&  'k' `elem` blackPlayerPieces = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'N' `elem` blackPlayerPieces = True
+ | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'n' `elem` whitePlayerPieces = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'B' `elem` blackPlayerPieces = True
+ | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'b' `elem` whitePlayerPieces = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'b' `elem` whitePlayerPieces && 'B' `elem` whitePlayerPieces  = True
+ | otherwise = False
+ where blackPlayerPieces = map getPieceName (getPlayerPieces board blackPlayer)
+       whitePlayerPieces = map getPieceName (getPlayerPieces board whitePlayer)
+       blackPlayerPos = map getPiecePosition (getPlayerPieces board blackPlayer)
+       whitePlayerPos = map getPiecePosition (getPlayerPieces board whitePlayer)
+
+ 
  
 
 
