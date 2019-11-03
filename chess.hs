@@ -410,7 +410,7 @@ posUnderAttackByKnight state (rank,file) player = map (\(_,pos,_,_) -> (pos, (ra
 -- Position under attack diagonally
 posUnderAttackDiagonally :: State -> Position -> Player -> [Move]
 posUnderAttackDiagonally state position player = validAttackingPieces
- where possibleAttackingPieces = filter (pieceOwner  player) (map (getPieceOnBoard (board state)) (filter checkValidPosition (diagonalPositions position)))
+ where possibleAttackingPieces = filter (pieceOwner  player) (map (getPieceOnBoard (board state)) (diagonalPositions position))
        -- Piece that make valid moves
        validAttackingPieces = filter (\move -> (checkValidPosition (fst move))) $  map (\piece -> if validMove state piece ((getPiecePosition piece), position)  player then ((getPiecePosition piece), position) else ((9,9), position)) possibleAttackingPieces
 -- Position under attack horizontally
@@ -425,17 +425,87 @@ posUnderAttackVertically state  (rank, file) player = validAttackingMoves
   where possibleAttackPieces = filter (pieceOwner  player) (map (getPieceOnBoard (board state)) ((zip [rank+1 .. 7] [file,file..]) ++ (zip [rank-1, rank-2 .. 0] [file, file .. ])))
         validAttackingMoves =filter (\move -> checkValidPosition (fst move) && checkValidPosition (snd move)) $ map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file))  player) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
 
+-- check for draws by insufficient material
+-- k-k
+-- k&k-b
+-- k&k-n
+-- k-b&k-b bishops redide on same color
+-- drawByInsufficientMaterial:: Board
+-- drawByInsufficientMaterial board
+--  | length blackPlayerPieces == 1 && length whitePlayerPieces  = True
+--  | otherwise = False
+--  where blackPlayerPieces = getPlayerPieces board blackPlayer
+--        whitePlayerPieces = getPlayerPieces board whitePlayer
+ 
+
+
 
 -- ###  Generate positions
 -- Generate all possible diagonal pieces relative to a position (with that position excluded)
 diagonalPositions:: Position -> [Position]
 diagonalPositions (rank, file) =
-  topLeft ++ topRight ++ bottomLeft ++ bottomRight
+   filter checkValidPosition (topLeft ++ topRight ++ bottomLeft ++ bottomRight)
   where topLeft = zip [rank-1 ,(rank-2) .. 0] [file-1, (file-2) .. 0] -- Generate one step away from current position
         topRight = zip [rank-1, (rank-2) .. 0] [(file+1) .. 7]
         bottomLeft = zip [(rank + 1) .. 7] [file-1, (file-2) ..]
         bottomRight = zip [(rank + 1) .. 7] [(file+1)..7]
 
+-- Generate horizontal positions -- useful for the rook and queen
+horizontalPositions :: Position -> [Position]
+horizontalPositions (rank, file) = filter checkValidPosition (zip [rank,rank..] [file-1,file-2 ..0]) ++ (zip [rank,rank..] [file+1..7])
+
+-- Generate vertical positions -- useful for rook and queen
+verticalPositions :: Position -> [Position]
+verticalPositions (rank, file) = filter checkValidPosition (zip [rank-1,rank-2 .. 0][file,file..]) ++ (zip [rank+1 .. 7][file,file..])
+
+-- pawn positions
+pawnPositions :: Position -> [Position]
+pawnPositions (rank, file) = filter checkValidPosition [(rank+1, file), (rank+1,file+1), (rank+2, file)]
+
+-- Generate knight posittions
+knightPositions :: Position -> [Position]
+knightPositions (rank,file) = filter checkValidPosition (map (\(r,f) -> (r+rank, f+file)) [(-2,1), (-2,-1), (2,1), (2,-1),  (-1,2), (-1,-2), (1,2), (1,-2)])
+
+-- Generate king positions 
+kingPositions :: Position -> [Position]
+kingPositions (rank, file) = filter checkValidPosition [(rank+1,file), (rank-1, file), (rank+1,file), (rank-1, file),(rank, file+2), (rank, file-2) ]
+
+-- generate positions 
+generatePositions :: Piece -> [Position]
+generatePositions piece
+ | pawn piece = pawnPositions position
+ | rook piece = (verticalPositions position) ++ (horizontalPositions position)
+ | knight piece = kingPositions position
+ | bishop piece =  diagonalPositions position
+ | queen piece = (verticalPositions position) ++ (horizontalPositions position) ++ (horizontalPositions position)
+ | king piece = kingPositions position
+ | otherwise = []
+ where position = getPiecePosition piece
+-- Get player pieces
+getPlayerPieces :: Board -> Player -> [Piece]
+getPlayerPieces board player = flatBoard
+  where flatBoard = filter (pieceOwner player) (concat (map (\(rank, pieces) -> pieces) board))
+-- check if a player is in a stalemate
+checkStalemate :: State -> Player -> Bool
+checkStalemate state player = (length (map (hasValidMoves state player) playerPieces)) > 0
+ where playerPieces = getPlayerPieces (board state) player
+
+-- Has valid moves
+hasValidMoves:: State -> Player -> Piece -> Bool
+hasValidMoves state player piece
+  | simulateMoves state piece position player positions = True
+  | otherwise =  False
+  where position = getPiecePosition piece
+        positions = generatePositions piece
+
+-- Simulate movements of the pieces
+simulateMoves :: State -> Piece -> Position -> Player -> [Position] -> Bool
+simulateMoves _ _ _ _ [] = False
+simulateMoves state piece position player (pos:positions)
+  | validMove state piece (position, pos) player =  
+    if (kingUnderThreat (makeMove state piece pos) player) then (simulateMoves state piece position player positions) else True
+    -- if the move is valid, it must not leave this player's king under attack
+  | otherwise = simulateMoves state piece position player positions
 -- Control the game from here
 step :: State -> Command -> (Message, Maybe State)
 step state command
@@ -454,12 +524,15 @@ step state command
 -- Success message
 validateSuccess :: State -> State  -> Player -> (Message, Maybe State)
 validateSuccess oldState newState currentPlayer
- | kingUnderThreat newState (otherPlayer currentPlayer) = ("Check:: Invalid move \n" ++ show currentPlayer ++ ", play again", Just oldState)
+ | kingUnderThreat newState currentPlayer = ("Invalid move, your king will be in check!! \n" ++ show currentPlayer ++ ", play again", Just oldState)
+ | kingUnderThreat newState (otherPlayer currentPlayer) && checkStalemate newState (otherPlayer currentPlayer) = ("Game over!! \n" ++ show (otherPlayer currentPlayer) ++ " is in check", Nothing)
+ | checkStalemate newState (otherPlayer currentPlayer)  = ("Game over !! \n" ++ show (otherPlayer currentPlayer) ++ " has no legal moves", Nothing)
+ | checkStalemate newState currentPlayer  = ("Game over !! \n" ++ show  currentPlayer ++ " has no legal moves", Nothing)
  | otherwise =  ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPlayer currentPlayer) ++ ", it is your turn",Just $ newState)
 -- Failure message 
 showError :: State -> (Message, Maybe State)
 showError state = ("Invalid move/command, try again", Just state)
--- Driver - enter program here 
+-- Driver - enter program here
 main :: IO ()
 main = loop $ Just test0
   where loop Nothing = return()
@@ -471,9 +544,3 @@ main = loop $ Just test0
             putStrLn $ show ms
             putStrLn m
             loop ms
-
-
-
--- TODO :: check for checkers
--- TODO :: draws
--- TODO -- stalemates
