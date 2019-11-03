@@ -110,13 +110,13 @@ makeRank 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7
 
 makeRank1:: Int -> [Piece]
 makeRank1 0 = DL.zip4 ['r', '.', '.', '.', 'k', '.', '.', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 1 = DL.zip4 (replicate 8 'P') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 2 = DL.zip4 (replicate 8 '.') (zip [2,2..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
-makeRank1 3 = DL.zip4 (replicate 8 '.') (zip [3,3..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
-makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 noplayer) (replicate 8 False)
-makeRank1 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 noplayer) (replicate 8 False)
-makeRank1 6 = DL.zip4 (replicate 8 'p') (zip [6,6..] [0..7])  (replicate 8 whitePlayer) (replicate 8 False)
-makeRank1 7 = DL.zip4 ['R', '.', '.', '.', 'K', '.', '.', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 1 = DL.zip4 (replicate 8 'q') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 2 = DL.zip4 (replicate 8 'n') (zip [2,2..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 3 = DL.zip4 (replicate 8 'n') (zip [3,3..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 4 = DL.zip4 (replicate 8 'P') (zip [4,4..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 5 = DL.zip4 (replicate 8 'n') (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 6 = DL.zip4 (replicate 8 'n') (zip [6,6..] [0..7])  (replicate 8 blackPlayer) (replicate 8 True)
+makeRank1 7 = DL.zip4 ['R', '.', 'q', '.', 'K', 'r', '.', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 -- Validate command is in right format  
 validCommand:: Command -> Bool
@@ -178,7 +178,7 @@ step state command
        piece = (getPieceOnBoard currentBoard (fst moveToBeMade))
        moveToBeMade = getMove command
        currentPlayer = player state
-       ownPiece = pieceOwner piece currentPlayer -- You can't move other player's pieces
+       ownPiece = pieceOwner currentPlayer piece  -- You can't move other player's pieces
        playerMoved = (stepsMoved moveToBeMade) /= (0,0) -- A player must make a move
        newPosition = snd moveToBeMade
        newRookKingSidePos = ((fst (snd moveToBeMade))  , ((snd (snd moveToBeMade)) - 1))
@@ -193,7 +193,7 @@ showSuccess state currentPlayer = ("🎊🎊🎊 Nice Move!!\n" ++ show (otherPl
 
 -- Failure message 
 showError :: State -> (Message, Maybe State)
-showError state = ("Invalid move/command, try again", Nothing)
+showError state = ("Invalid move/command, try again", Just state)
 
 promotePawn :: Piece -> Move -> Player ->  Piece
 promotePawn (name, pos, player, moved) move currentPlayer 
@@ -230,7 +230,7 @@ checkPawnMove state move player
         pieceAtOrigin = (getPieceOnBoard (board state) (fst move))
         pieceAtDestination = (getPieceOnBoard currentBoard destinationPosition)
         unoccupiedDestination = emptyPosition currentBoard destinationPosition
-        pieceOwnedByOtherPlayer = pieceOwner pieceAtDestination (otherPlayer player)
+        pieceOwnedByOtherPlayer = pieceOwner (otherPlayer player) pieceAtDestination 
         steps = stepsMoved move
         movedVertically = verticalMove move
         movedForward = forwardMove player move
@@ -247,7 +247,7 @@ checkRookMove state move player
         destinationPosition = (snd move)
         destinationPiece = getPieceOnBoard currentBoard destinationPosition
         emptyDestination = emptyPosition currentBoard destinationPosition
-        ownedByOtherPlayer = pieceOwner destinationPiece $ otherPlayer player
+        ownedByOtherPlayer = pieceOwner (otherPlayer player) destinationPiece 
 -- Knight movement 
 -- Knight can move over pieces
 checkKnightMove:: State -> Move -> Player -> Bool 
@@ -257,7 +257,7 @@ checkKnightMove state move player =
   currentBoard = (board state)
   destinationPosition = (snd move)
   emptyDestination = emptyPosition currentBoard destinationPosition
-  ownedByOtherPlayer = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
+  ownedByOtherPlayer = pieceOwner (otherPlayer player) (getPieceOnBoard currentBoard destinationPosition) 
 
 -- Bishop movements
 -- A bishop moves diagonally
@@ -268,7 +268,7 @@ checkBishopMove state move player
   where
     currentBoard = (board state)
     destinationPosition = (snd move)
-    otherPlayerPiece = pieceOwner (getPieceOnBoard currentBoard destinationPosition) (otherPlayer player)
+    otherPlayerPiece = pieceOwner (otherPlayer player) (getPieceOnBoard currentBoard destinationPosition) 
     emptyDestination = emptyPosition currentBoard destinationPosition
     obstructed = diagonallyObstracted currentBoard move
 
@@ -296,7 +296,7 @@ checkKingMove state move player
         destinationPiece = getPieceOnBoard currentBoard destinationPosition
         piecePlayed = getPieceOnBoard currentBoard (fst move)
         emptyDestination = emptyPosition currentBoard destinationPosition
-        otherPlayerPiece = pieceOwner destinationPiece (otherPlayer player)
+        otherPlayerPiece = pieceOwner (otherPlayer player) destinationPiece 
         singleStep = (stepsMoved move == (1,0)) || (stepsMoved move == (0,1))
         twoSteps = (stepsMoved move == (0,2))
 
@@ -395,27 +395,27 @@ posUnderAttackByKnight board (rank,file) = map (\(_,pos,_,_) -> (pos, (rank,file
        knightAttackingRelativePos = [(-2,1), (-2,-1), (2,1), (2,-1),  (-1,2), (-1,-2), (1,2), (1,-2)]
 -- Check valid positions 
 checkValidPosition :: Position -> Bool
-checkValidPosition (rank, file) = (rank >=0 || rank < 8) && (file >= 0 && file < 8)
+checkValidPosition (rank, file) = (rank >=0 && rank < 8) && (file >= 0 && file < 8)
 -- Position under attack diagonally
 posUnderAttackDiagonally :: State -> Position -> Player -> [Move]
 posUnderAttackDiagonally state position player = validAttackingPieces
- where possibleAttackingPieces = filter ((flip pieceOwner) (otherPlayer player)) (map (getPieceOnBoard (board state)) (filter checkValidPosition (diagonalPositions position)))
+ where possibleAttackingPieces = filter (pieceOwner  player) (map (getPieceOnBoard (board state)) (filter checkValidPosition (diagonalPositions position)))
        -- Piece that make valid moves
-       validAttackingPieces = map (\piece -> if validMove state piece ((getPiecePosition piece), position) (otherPlayer player) then ((getPiecePosition piece), position) else ((9,9), position)) possibleAttackingPieces
+       validAttackingPieces = filter (\move -> (checkValidPosition (fst move))) $  map (\piece -> if validMove state piece ((getPiecePosition piece), position)  player then ((getPiecePosition piece), position) else ((9,9), position)) possibleAttackingPieces
 
 
 -- Position under attack horizontally
 posUnderAttackHorizontally :: State -> Position -> Player -> [Move]
 posUnderAttackHorizontally state  (rank, file) player = validAttackingMoves
-  where possibleAttackPieces = filter ((flip pieceOwner) (otherPlayer player)) (map (getPieceOnBoard (board state)) ((zip [rank,rank .. ] [file - 1,file - 2 .. 0]) ++ (zip [rank,rank .. ] [file + 1 .. 7])))
-        validAttackingMoves = map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file)) (otherPlayer player)) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
+  where possibleAttackPieces = filter (pieceOwner player) (map (getPieceOnBoard (board state)) ((zip [rank,rank .. ] [file - 1,file - 2 .. 0]) ++ (zip [rank,rank .. ] [file + 1 .. 7])))
+        validAttackingMoves = filter (\move -> checkValidPosition (fst move) && checkValidPosition (snd move)) $ map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file))  player) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
+        
 
-
--- Positioon under attack vertically
+-- Position under attack vertically
 posUnderAttackVertically:: State -> Position -> Player -> [Move]
 posUnderAttackVertically state  (rank, file) player = validAttackingMoves
-  where possibleAttackPieces = filter ((flip pieceOwner) (otherPlayer player)) (map (getPieceOnBoard (board state)) ((zip [rank+1 .. 7] [file,file..]) ++ (zip [rank+1 .. 7] [file, file .. ])))
-        validAttackingMoves = map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file)) (otherPlayer player)) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
+  where possibleAttackPieces = filter (pieceOwner  player) (map (getPieceOnBoard (board state)) ((zip [rank+1 .. 7] [file,file..]) ++ (zip [rank-1, rank-2 .. 0] [file, file .. ])))
+        validAttackingMoves =filter (\move -> checkValidPosition (fst move) && checkValidPosition (snd move)) $ map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file))  player) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
 
 -- ###Diagonal## ---
 -- Diagonal move
@@ -427,10 +427,10 @@ diagonalMove ((fromRank, fromFile), (toRank, toFile)) =
 diagonalPositions:: Position -> [Position]
 diagonalPositions (rank, file) =
   topLeft ++ topRight ++ bottomLeft ++ bottomRight
-  where topLeft = zip [rank-1 ,(rank-2) .. 1] [file-1, (file-2) .. 1] -- Generate one step away from current position
-        topRight = zip [rank-1, (rank-2) .. 1] [(file+1) .. 8]
-        bottomLeft = zip [(rank + 1) .. 8] [file-1, (file-2) ..]
-        bottomRight = zip [(rank + 1) ..8] [(file+1)..8]
+  where topLeft = zip [rank-1 ,(rank-2) .. 0] [file-1, (file-2) .. 0] -- Generate one step away from current position
+        topRight = zip [rank-1, (rank-2) .. 0] [(file+1) .. 7]
+        bottomLeft = zip [(rank + 1) .. 7] [file-1, (file-2) ..]
+        bottomRight = zip [(rank + 1) .. 7] [(file+1)..7]
 
 -- Empty Position?
 emptyPosition:: Board -> Position -> Bool
@@ -442,8 +442,8 @@ stepsMoved ((fromRank, fromFile), (toRank, toFile)) =
   (abs $ fromRank - toRank, abs $ fromFile - toFile)
 
 -- Does a piece belong to a given player? 
-pieceOwner::Piece -> Player -> Bool
-pieceOwner (p,_,_,_) player
+pieceOwner::Player -> Piece  -> Bool
+pieceOwner player (p,_,_,_) 
  | player == whitePlayer = Data.Char.isUpper p
  | player == blackPlayer = Data.Char.isLower p
  | otherwise = False
@@ -454,11 +454,11 @@ hasPieceMoved (p,_,_,moved) = moved
 
 -- Driver - enter program here 
 main :: IO ()
-main = loop $ Just state0
+main = loop $ Just test0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn (if s == state0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
+            putStrLn (if s == test0 then show s ++ "\n\n 😉 " ++whitePlayer ++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
             putStrLn $ show ms
@@ -466,3 +466,8 @@ main = loop $ Just state0
             loop ms
 
 
+-- TODO:: Start by testing the attack functions
+-- TODO :: Implement en passant 
+-- TODO :: check for checkers
+-- TODO :: draws
+-- TODO -- stalemates
