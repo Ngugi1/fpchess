@@ -13,9 +13,6 @@ type Position = (Int, Int)
 -- Check valid positions 
 checkValidPosition :: Position -> Bool
 checkValidPosition (rank, file) = (rank >=0 && rank < 8) && (file >= 0 && file < 8)
--- Get Piece on a board
-getPieceOnBoard:: Board -> Position -> Piece
-getPieceOnBoard board (rank, file) = (snd (board !! rank)) !! file
 -- Empty Position?
 emptyPosition:: Board -> Position -> Bool
 emptyPosition board position = emptyPiece (getPieceOnBoard board position)
@@ -49,6 +46,9 @@ pieceOwner player (p,_,_,_)
 type Rank = Int
 -- A board is an arrangement of list of pieces in ranks (8 ranks)
 type Board = [(Rank, [Piece])]
+-- Get Piece on a board
+getPieceOnBoard:: Board -> Position -> Piece
+getPieceOnBoard board (rank, file) = (snd (board !! rank)) !! file
 -- State is the Board Positions occupied by both players and the the current player
 data State = State {board :: Board, player :: Player} deriving (Eq)
 -- Implement show method to display the state

@@ -1,0 +1,1 @@
+chess.hs is the entry point
