@@ -110,14 +110,14 @@ makeRank 6 = DL.zip4 (replicate 8 'P') (zip [6,6..] [0..7])  (replicate 8 whiteP
 makeRank 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 makeRank1:: Int -> [Piece]
-makeRank1 0 = DL.zip4 ['r', '.', '.', '.', 'k', '.', '.', 'r'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 1 = DL.zip4 (replicate 8 'q') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 2 = DL.zip4 (replicate 8 'n') (zip [2,2..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 3 = DL.zip4 (replicate 8 'n') (zip [3,3..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 0 = DL.zip4 ['.', '.', '.', '.', 'k', '.', '.', '.'] (zip [0,0..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 1 = DL.zip4 (replicate 8 '.') (zip [1,1..] [0..7])   (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 2 = DL.zip4 (replicate 8 '.') (zip [2,2..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 3 = DL.zip4 (replicate 8 '.') (zip [3,3..] [0..7]) (replicate 8 blackPlayer) (replicate 8 False)
 makeRank1 4 = DL.zip4 (replicate 8 '.') (zip [4,4..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
-makeRank1 5 = DL.zip4 ['.', 'q', 'q', '.', '.', '.', 'q', 'q'] (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 6 = DL.zip4 ['.', '.', '.', 'P', '.', '.', '.', '.'] (zip [6,6..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
-makeRank1 7 = DL.zip4 ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
+makeRank1 5 = DL.zip4 (replicate 8 '.') (zip [5,5..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 6 = DL.zip4 ['.', 'B', '.', '.', 'p', '.', '.', '.'] (zip [6,6..] [0..7])  (replicate 8 blackPlayer) (replicate 8 False)
+makeRank1 7 = DL.zip4 ['b', '.', '.', '.', 'K', '.', '.', '.'] (zip [7,7..] [0..7]) (replicate 8 whitePlayer) (replicate 8 False)
 
 -- Validate command is in right format
 validCommand:: Command -> Bool
@@ -429,6 +429,8 @@ posUnderAttackVertically state  (rank, file) player = validAttackingMoves
         validAttackingMoves =filter (\move -> checkValidPosition (fst move) && checkValidPosition (snd move)) $ map (\piece -> if (validMove state piece ((getPiecePosition piece), (rank, file))  player) then ((getPiecePosition piece), (rank, file)) else ((9,9),(rank, file))) possibleAttackPieces
 
 -- check for draws by insufficient material
+whiteSquares =  (zip [0,2..7] [0,0..]) ++ (zip [1,3..7] [1,1..]) ++ (zip [0,2..7] [2,2..]) ++ (zip [1,3..7] [3,3..]) ++ (zip [0,2..7] [4,4..])
+                 ++ (zip [1,3..7] [5,5..]) ++ (zip [0,2..7] [6,6..])  ++ (zip [1,3..7] [7,7..])
 -- k-k
 -- k&k-b
 -- k&k-n
@@ -437,16 +439,12 @@ posUnderAttackVertically state  (rank, file) player = validAttackingMoves
 drawByInsufficientMaterial:: Board -> Bool
 drawByInsufficientMaterial board
  | length blackPlayerPieces == 1 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces &&  'k' `elem` blackPlayerPieces = True
- | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'N' `elem` blackPlayerPieces = True
- | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'n' `elem` whitePlayerPieces = True
- | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'B' `elem` blackPlayerPieces = True
- | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'b' `elem` whitePlayerPieces = True
- | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 
- 'b' `elem` whitePlayerPieces && 'B' `elem` whitePlayerPieces && even (fst (bbishop !! 0)) && even (snd (bbishop !! 0)) && 
- even (fst (wbishop !! 0)) && even (snd (wbishop !! 0))  = True
- | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 
- 'b' `elem` whitePlayerPieces && 'B' `elem` whitePlayerPieces && odd (fst (bbishop !! 0)) && odd (snd (bbishop !! 0)) && 
- odd (fst (wbishop !! 0)) && odd (snd (wbishop !! 0))  = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'n' `elem` blackPlayerPieces = True
+ | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'N' `elem` whitePlayerPieces = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 1 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'b' `elem` blackPlayerPieces = True
+ | length blackPlayerPieces == 1 && length whitePlayerPieces == 2 && 'K' `elem` whitePlayerPieces && 'k' `elem` blackPlayerPieces && 'B' `elem` whitePlayerPieces = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && (wbishop !! 0) `elem` whiteSquares &&  (bbishop !! 0) `elem` whiteSquares = True
+ | length blackPlayerPieces == 2 && length whitePlayerPieces == 2 && not ((wbishop !! 0) `elem` whiteSquares) &&  not ((bbishop !! 0) `elem` whiteSquares) = True 
  | otherwise = False
  where blackPlayerPieces = map getPieceName (getPlayerPieces board blackPlayer)
        whitePlayerPieces = map getPieceName (getPlayerPieces board whitePlayer)
@@ -553,7 +551,7 @@ main = loop $ Just state0
   where loop Nothing = return()
         loop (Just s) =
           do
-            putStrLn (if s == state0 then show s ++ "\n\n " ++whitePlayer ++ ",it is your turn" else "")
+            putStrLn (if s == state0 then show s ++ "\n\n " ++whitePlayer++ ",it is your turn" else "")
             c <- getLine
             let (m, ms) = step s c
             putStrLn $ show ms
